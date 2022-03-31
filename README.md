@@ -5,4 +5,4 @@ This application requires you have access to a running MQTT Broker. This has bee
 
 Configuration is loaded via a json file. The json format is output in the help (-h). 
 
-This project was built from the excellent MQTT documentation and repo here: https://github.com/eclipse/paho.mqtt.python I am sure the examples in that repo are very good and cover many more aspects.
+This project was built from the excellent MQTT documentation here: https://github.com/eclipse/paho.mqtt.python I am sure the examples in that repo are very good and cover many more aspects.
