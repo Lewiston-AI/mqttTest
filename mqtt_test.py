@@ -81,17 +81,13 @@ def connect_hivemq(publisher, subscriber, mqtt_url, mqtt_port, mqtt_user, mqtt_p
     return client
 
 
-topics = [("somedatasource/currenttime", 0), ("somedatasource/currenttime_smaller", 0)]
-
-
-def publish_current_time(client):
+def publish_current_time(client, topics):
     current = datetime.now()
     start = datetime(1970, 1, 1)
     payload = (current - start).total_seconds()
-    topic = topics[0][0]
-    client.publish(topic, payload)
-    topic = topics[1][0]
-    client.publish(topic, payload / 1000)
+    for i in range(0,len(topics)-1):
+        client.publish(topics[i][0], payload)
+        payload = payload / ((i + 1) * 1000)
 
 
 def print_start_msg(args):
@@ -99,17 +95,17 @@ def print_start_msg(args):
     print(f'{args}')
 
 
-def run(client, publisher, subscriber):
+def run(client, publisher, subscriber, topics):
     if subscriber:
         client.subscribe(topics)
     while keepRunning:
         if publisher:
-            publish_current_time(client)
+            publish_current_time(client, topics)
             time.sleep(random.randint(1, 5))  # simulate doing some work
         client.loop(10.0)  # this lop will return before timeout of there is data (at least testing suggests this)
     print('Exiting application')
-    client.unsubscribe(topics[0][0])
-    client.unsubscribe(topics[1][0])
+    for i in range(0,len(topics)-1):
+        client.unsubscribe(topics[i][0])
     client.disconnect(0)
     client.loop(3.0)
 
@@ -120,22 +116,35 @@ def read_config(path_to_config):
     obj = json.loads(data)
     return obj
 
+class Topic:
+    description = None
+    path = None
+    qos = None
+
+    def __init__(self, description, path, qos):
+        self.description = description
+        self.path = path
+        self.qos = qos
+
 
 class Configuration:
+    description = None
     subscriber = None
     publisher = None
     mqtt_url = None
     mqtt_port = 1883
     mqtt_user = None
     mqtt_pw = None
+    topics = None
 
-    def __init__(self, subscriber, publisher, mqtt_url, mqtt_port, mqtt_user, mqtt_pw):
+    def __init__(self, subscriber, publisher, mqtt_url, mqtt_port, mqtt_user, mqtt_pw, topics):
         self.subscriber = subscriber
         self.publisher = publisher
         self.mqtt_url = mqtt_url
         self.mqtt_port = mqtt_port
         self.mqtt_user = mqtt_user
         self.mqtt_pw = mqtt_pw
+        self.topics = topics
 
 
 class ConfigurationEncoder(JSONEncoder):
@@ -147,7 +156,12 @@ class ConfigurationEncoder(JSONEncoder):
 
 
 if __name__ == '__main__':
-    example_config = Configuration(True, True, "mqtt.example.com", 8883, "someuser", "somepassword")
+    topics = []
+    topics.append( Topic("", "datasource/attr1", 0).__dict__ )
+    topics.append( Topic("", "datasource/attr2", 0).__dict__ )
+    topics.append( Topic("", "datasource/attr3", 0).__dict__ )
+
+    example_config = Configuration(True, True, "mqtt.example.com", 8883, "someuser", "somepassword", topics)
     jsonString = ConfigurationEncoder().encode(example_config)
     parser = argparse.ArgumentParser(description='Create a publisher and/or a subscriber to a MQTT Broker',
                                      allow_abbrev=True, epilog='This app can run just as subscriber, just as a '
@@ -162,4 +176,8 @@ if __name__ == '__main__':
     mqttc = connect_hivemq(config['publisher'], config['subscriber'], config['mqtt_url'], config['mqtt_port'],
                            config['mqtt_user'],
                            config['mqtt_pw'])
-    run(mqttc, config['publisher'], config['subscriber'])
+    ts = config["topics"]
+    topics = []
+    for t in ts:
+        topics.append((t["path"], t["qos"]))
+    run(mqttc, config['publisher'], config['subscriber'], topics)
